@@ -100,6 +100,7 @@ def build_alert(
         run_time=epoch_millis_to_iso(outcome.timestamp_millis),
         run_timestamp_millis=outcome.timestamp_millis or 0,
         datahub_url=_asset_url(datahub_base_url, dataset_urn),
+        idempotency_key=_idempotency_key(outcome),
     )
 
     facts = MatchFacts(
@@ -122,6 +123,11 @@ def build_alert(
         run_timestamp_millis=outcome.timestamp_millis or 0,
         assertion=assertion,
     )
+
+
+def _idempotency_key(outcome: AssertionRunOutcome) -> str:
+    run = outcome.run_id or str(outcome.timestamp_millis or "")
+    return f"{outcome.assertion_urn or ''}:{run}"
 
 
 def _platform_key(dataset: dict) -> str | None:

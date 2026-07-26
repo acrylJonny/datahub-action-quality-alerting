@@ -86,6 +86,9 @@ class AlertContext(BaseModel):
     run_time: str = ""
     run_timestamp_millis: int = 0
     datahub_url: str = ""
+    # Stable per-failure identity ({assertion_urn}:{run_id|timestamp}); used for
+    # sink-level idempotency so replays/retries never create duplicate tickets.
+    idempotency_key: str = ""
 
     def template_vars(self) -> dict[str, str]:
         # A missing placeholder is rendered as an empty string, never a KeyError.

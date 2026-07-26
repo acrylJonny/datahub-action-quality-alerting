@@ -157,11 +157,23 @@ class DedupSettings(BaseModel):
     # Only fire when the previous completed run was not already a failure, so a
     # persistently-failing check does not open a ticket on every scheduled run.
     only_on_transition: bool = True
-    # Also persist a marker (structured property on the assertion) so restarts /
-    # catchup passes never re-fire for a run already handled. Requires the SP to
-    # be registered once (scripts/setup_dedup_property.py).
-    use_structured_property: bool = False
+    # Persist a marker (structured property on the assertion) so restarts /
+    # replays never re-fire for a run already handled. On by default for
+    # durability; register the property once (scripts/setup_dedup_property.py).
+    # If the property is missing, dedup degrades to the transition + sink-level
+    # idempotency layers rather than failing.
+    use_structured_property: bool = True
     property_qualified_name: str = DEDUP_PROPERTY_QUALIFIED_NAME
+
+
+class RetryConfig(BaseModel):
+    """In-process retry for transient sink failures (5xx / 429 / timeouts /
+    connection errors). Non-transient errors (4xx, bad templates) fail fast."""
+
+    max_attempts: int = 4
+    backoff_seconds: float = 2.0
+    backoff_multiplier: float = 2.0
+    max_backoff_seconds: float = 30.0
 
 
 class RuleConfig(BaseModel):
@@ -185,6 +197,8 @@ class QualityAlertingConfig(BaseModel):
     lookback_days: int = 7
     # Global default dedup, overridable per rule.
     dedup: DedupSettings = Field(default_factory=DedupSettings)
+    # In-process retry policy for transient sink failures.
+    retry: RetryConfig = Field(default_factory=RetryConfig)
     # Global dry-run forces every sink into dry-run regardless of its own flag.
     dry_run: bool = False
 

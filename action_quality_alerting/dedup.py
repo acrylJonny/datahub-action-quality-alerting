@@ -26,6 +26,22 @@ logger = logging.getLogger(__name__)
 
 _FAILING_RESULTS = {RESULT_FAILURE, RESULT_ERROR}
 
+# The marker is on by default; if the structured property is not registered every
+# call would otherwise warn. Warn once, then drop to debug so logs stay readable.
+_marker_warned = False
+
+
+def _warn_marker_once(message: str) -> None:
+    global _marker_warned
+    if _marker_warned:
+        logger.debug(message)
+        return
+    _marker_warned = True
+    logger.warning(
+        message + " (further marker warnings suppressed; register the property via "
+        "scripts/setup_dedup_property.py or set dedup.use_structured_property=false)"
+    )
+
 
 def _property_urn(qualified_name: str) -> str:
     return f"urn:li:structuredProperty:{qualified_name}"
@@ -47,7 +63,7 @@ def read_marker(graph: object, assertion_urn: str, qualified_name: str) -> int |
     try:
         data = gql.execute_graphql(graph, GET_ASSERTION_MARKER_QUERY, {"urn": assertion_urn})
     except Exception as exc:
-        logger.warning(f"[dedup] marker read failed for {assertion_urn}: {exc}")
+        _warn_marker_once(f"[dedup] marker read failed for {assertion_urn}: {exc}")
         return None
     assertion = (data or {}).get("assertion") or {}
     props = (assertion.get("structuredProperties") or {}).get("properties") or []
@@ -86,7 +102,7 @@ def write_marker(graph: object, assertion_urn: str, qualified_name: str, ts: int
     except Exception as exc:
         # A missing/unregistered property must not break alerting; it just means
         # dedup falls back to the transition + in-memory layers.
-        logger.warning(f"[dedup] marker write failed for {assertion_urn}: {exc}")
+        _warn_marker_once(f"[dedup] marker write failed for {assertion_urn}: {exc}")
 
 
 def should_fire(
