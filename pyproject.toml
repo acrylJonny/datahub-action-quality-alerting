@@ -32,7 +32,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "types-requests",
-    "freezegun>=1.2.0",
+    "time-machine>=2.0.0",
 ]
 
 # Registered so the action can be referenced by `type:` in an action recipe,
@@ -63,7 +63,7 @@ module = [
     "datahub.*",
     "datahub_actions.*",
     "requests.*",
-    "freezegun.*",
+    "time_machine.*",
     "_pytest.*",
     "pytest.*",
 ]
