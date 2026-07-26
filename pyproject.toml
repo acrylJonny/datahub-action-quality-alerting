@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "datahub-action-quality-alerting"
-version = "0.1.0"
+version = "0.2.0"
 description = "DataHub Action that triggers external actions (webhook, REST, Jira, ServiceNow, Slack/Teams) in response to DataHub events such as data-contract / assertion validation failures"
 readme = "README.md"
 requires-python = ">=3.10"
