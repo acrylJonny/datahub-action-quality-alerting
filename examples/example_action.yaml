@@ -1,0 +1,134 @@
+# Example configuration for the Quality Alerting action.
+#
+# Author: Jonny Dixon
+#
+# Triggers external actions (webhook, REST, Jira, ServiceNow, Slack/Teams) when a
+# DataHub assertion / data-contract validation produces a result you care about
+# (FAILURE by default). The scheduling model matches the access-provisioner: the
+# DataHub Cloud executor reaps idle actions, so run this on a schedule. Each run
+# does a startup catchup (scan currently-failing assertions) then listens for
+# live assertionRunEvent MCL events for the remaining window.
+
+# =============================================================================
+# DATAHUB CLOUD DEPLOYMENT (recommended)
+# =============================================================================
+name: quality-alerting
+
+source:
+  type: datahub_integrations.sources.remote_actions.remote_action_source.RemoteActionSource
+  config:
+    action_urn: "urn:li:dataHubAction:quality-alerting"
+    stage: live
+    action_spec:
+      type: "action-quality-alerting"
+      config:
+        # Optional: used only to build clickable asset links inside alerts.
+        datahub_base_url: "https://your-instance.acryl.io"
+
+        # How far back the startup catchup considers (currently-failing scan).
+        lookback_days: 7
+
+        # Global dedup defaults (override per rule under rule.dedup).
+        dedup:
+          only_on_transition: true       # fire only on SUCCESS->FAILURE, not every run
+          use_structured_property: false # set true for cross-restart idempotency
+                                         # (register the property first, see scripts/)
+
+        # dry_run: true forces every sink into dry-run (logs, no external calls).
+        dry_run: false
+
+        rules:
+          # -----------------------------------------------------------------
+          # Flagship: a Data Contract validation fails -> open a Jira ticket.
+          # only_contract_assertions restricts to assertions bound to a contract.
+          # -----------------------------------------------------------------
+          - name: contract-fail-to-jira
+            match:
+              event: assertion_result
+              result_types: ["FAILURE"]
+              only_contract_assertions: true
+              filter:
+                platforms: ["databricks", "snowflake"]   # optional
+                # domains: ["urn:li:domain:finance"]
+                # severities: ["HIGH"]
+            sinks:
+              - type: jira
+                base_url: "https://yourco.atlassian.net"
+                username: "svc-account@yourco.com"
+                api_token: "${JIRA_API_TOKEN}"
+                project_key: "DQ"
+                issue_type: "Bug"
+                summary_template: "[DataHub] Contract failed: {asset_name}"
+                body_template: |
+                  Data contract validation FAILED.
+
+                  Asset: {asset_name} ({asset_urn})
+                  Assertion: {assertion_description}
+                  Domain: {domain_name}
+                  Owners: {owners}
+                  Observed: rows={row_count} unexpected={unexpected_count}
+                  Run at: {run_time}
+                  Open in DataHub: {datahub_url}
+
+          # -----------------------------------------------------------------
+          # Any assertion failure -> POST to a generic webhook (HMAC-signed).
+          # -----------------------------------------------------------------
+          - name: any-fail-to-webhook
+            match:
+              event: assertion_result
+              result_types: ["FAILURE", "ERROR"]
+            sinks:
+              - type: webhook
+                url: "https://automation.yourco.com/hooks/datahub-dq"
+                method: POST
+                headers:
+                  X-Source: "datahub"
+                auth:
+                  type: hmac
+                  secret: "${WEBHOOK_HMAC_SECRET}"
+                  header: "X-DataHub-Signature"
+                # Optional custom JSON body; omit for the default envelope.
+                json_template: |
+                  {
+                    "event": "assertion_failure",
+                    "asset": "{asset_urn}",
+                    "assertion": "{assertion_urn}",
+                    "result": "{result_type}",
+                    "severity": "{severity}",
+                    "url": "{datahub_url}"
+                  }
+
+              # A second sink on the same rule: notify a Slack channel.
+              - type: chat
+                platform: slack
+                webhook_url: "${SLACK_WEBHOOK_URL}"
+
+datahub:
+  server: "https://your-instance.acryl.io/gms"
+  token: "${DATAHUB_TOKEN}"
+
+# When creating the ingestion source in the DataHub Cloud UI, add the wheel under
+# Step 5 -> Advanced -> Extra Pip Libraries, e.g.:
+#   ["/datahub-integrations-service", "datahub-action-quality-alerting"]
+
+# =============================================================================
+# LOCAL / SELF-HOSTED (development and testing)
+# =============================================================================
+# Replace the source block above with the following and run:
+#   datahub actions -c examples/example_action.yaml
+#
+# name: quality-alerting
+#
+# source:
+#   type: "datahub-cloud"
+#   config:
+#     kill_after_idle_timeout: false
+#
+# action:
+#   type: "action-quality-alerting"
+#   config:
+#     <same config block as action_spec.config above>
+#
+# datahub:
+#   server: "https://your-instance.acryl.io/gms"
+#   token: "${DATAHUB_TOKEN}"

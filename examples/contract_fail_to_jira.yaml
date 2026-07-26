@@ -1,0 +1,30 @@
+# Minimal local recipe: open a Jira ticket when a Data Contract validation fails.
+# Run with:  datahub actions -c examples/contract_fail_to_jira.yaml
+name: quality-alerting
+
+source:
+  type: "datahub-cloud"
+  config:
+    kill_after_idle_timeout: false
+
+action:
+  type: "action-quality-alerting"
+  config:
+    datahub_base_url: "https://your-instance.acryl.io"
+    rules:
+      - name: contract-fail-to-jira
+        match:
+          event: assertion_result
+          result_types: ["FAILURE"]
+          only_contract_assertions: true
+        sinks:
+          - type: jira
+            base_url: "https://yourco.atlassian.net"
+            username: "svc-account@yourco.com"
+            api_token: "${JIRA_API_TOKEN}"
+            project_key: "DQ"
+            issue_type: "Bug"
+
+datahub:
+  server: "https://your-instance.acryl.io/gms"
+  token: "${DATAHUB_TOKEN}"

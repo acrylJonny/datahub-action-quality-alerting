@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datahub-action-quality-alerting"
+version = "0.1.0"
+description = "DataHub Action that triggers external actions (webhook, REST, Jira, ServiceNow, Slack/Teams) in response to DataHub events such as data-contract / assertion validation failures"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Jonny Dixon" },
+]
+dependencies = [
+    "pydantic>=2.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["action_quality_alerting*"]
+exclude = ["tests*"]
+
+[project.optional-dependencies]
+dev = [
+    "acryl-datahub-actions>=1.0.0",
+    "acryl-datahub>=1.0.0",
+    "requests>=2.28.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "types-requests",
+    "freezegun>=1.2.0",
+]
+
+# Registered so the action can be referenced by `type:` in an action recipe,
+# exactly like the access-provisioner repo.
+[project.entry-points."datahub_actions.action.plugins"]
+action-quality-alerting = "action_quality_alerting.quality_alerting_action:QualityAlertingAction"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["action_quality_alerting"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+
+[[tool.mypy.overrides]]
+module = [
+    "datahub.*",
+    "datahub_actions.*",
+    "requests.*",
+    "freezegun.*",
+    "_pytest.*",
+    "pytest.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+addopts = "-m 'not integration'"
